@@ -6,26 +6,27 @@
 
 
 import requests
+import server as server
 import json
 import xmltodict
 
 
 class WechatAPI(object):
     def __init__(self):
-        """
-        类初始化函数
-        :param on_message: 收到微信消息时的回调函数
-        """
         self.url = "http://127.0.0.1:8203/api?json"
-        self.params = {"key":self.get_key()}
+        self.params = {"key": ""}
+        self.server = False
 
-    def start(self):
+    def start(self,on_message):
         """
         启动http服务
         """
         boot = self.bootwechat()  # 初始化微信连接
         print('boot:' + str(boot))
         self.ShowWX(boot['pid'])
+        if "http://127.0.0.1:8889/WechatAPI" not in str(self.Get_HttpNotify()):
+            print("到e小天设置中心创建通知地址为‘http://127.0.0.1:8889/WechatAPI’的通知推送")
+        server.Start(on_message)
 
     def postApi(self, data):
         """
@@ -33,7 +34,10 @@ class WechatAPI(object):
         :param data: 传递给接口的数据
         :return: 接口返回的数据
         """
-        response = requests.post(url=self.url, data=data, params=self.params)
+        header = {
+            "Referer":"http://127.0.0.1:8203"  #本地请求带上referer可免key
+        }
+        response = requests.post(url=self.url, headers=header, data=data, params=self.params)
         if response:
             return response.json()
         return 0
@@ -81,6 +85,18 @@ class WechatAPI(object):
         }
         return self.postApi(data)
 
+    def RunSql(self, pid, db, sql):
+        """
+        查询本地数据库
+        """
+        data = {
+            "method": "runSql",
+            "db": db,
+            "sql": sql,
+            "pid": pid
+        }
+        return self.postApi(data)
+
     # 获取用户登录信息
     def GetUserInfo(self, pid):
         """
@@ -91,6 +107,22 @@ class WechatAPI(object):
             "pid": pid
         }
         return self.postApi(data)
+
+    def GetUserImg(self,pid,wxid):
+        if '@openim' in wxid:
+            db = "OpenIMContact.db"
+            sql = f"SELECT UserName wxid,BigHeadImgUrl headImg FROM OpenIMContact where UserName = '{wxid}' limit 1;"
+            data = self.RunSql(pid, db, sql)
+            if data['data']:
+                data['data'] = data['data'][0]
+                return data
+        else:
+            data = {
+                "method": "getUserImg",
+                "wxid": wxid,
+                "pid": pid
+            }
+            return self.postApi(data)
 
     # 获取用户通讯录
     def GetAllList(self, pid):
@@ -280,22 +312,37 @@ class WechatAPI(object):
         }
         return self.postApi(data)
 
-    # 移除群聊
+        # 移除群聊
     def DelRoomMember(self, pid, chatroom, wxid):
+            data = {
+                "method": "delRoomMember",
+                "wxid": chatroom,
+                "msg": wxid,
+                "pid": pid
+            }
+            return self.postApi(data)
+
+    # 添加好友
+    def AddUser(self, pid, wxid, msg):
+        """
+        添加好友
+        :param wxid: 添加好友的wxid（wxid）
+        :param msg: 添加好友时的验证内容（msg）
+        :return: 返回接口信息
+        """
         data = {
-            "method": "delRoomMember",
-            "wxid": chatroom,
-            "msg": wxid,
+            "method": "addUser",
+            "wxid": wxid,
+            "msg": msg,
             "pid": pid
         }
         return self.postApi(data)
-
 
     # 同意添加好友
     def AgreeUser(self, pid, msg):
         """
         同意添加好友
-        :param msg: 好友请求消息里的msg
+        :param msg: 回调接口里的msg
         :return: 返回接口信息
         """
         msg_dict = json.loads(json.dumps(xmltodict.parse(msg)))
@@ -315,7 +362,7 @@ class WechatAPI(object):
         """
         同意添加好友
         :wxid: 需要发给谁（wxid）
-        :xml: 需要发送的xml，可以直接转发消息回调接口消息里的xml
+        :xml: 需要发送的xml，可以直接转发会调接口消息里的xml
         """
         data = {
             "method": "sendArticle",
@@ -325,15 +372,6 @@ class WechatAPI(object):
         }
 
         return self.postApi(data)
-
-    def environment_variable(self):
-        with open(r'C:\Users\Public\Documents\wxext.cn\WxExt.ini', encoding='utf-8') as f:
-            data = f.read()
-        return json.loads(data)
-
-    def get_key(self):
-        data = self.environment_variable()
-        return data["key"]
 
     def ListWechat(self):
         data = {

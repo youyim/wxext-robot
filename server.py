@@ -17,20 +17,20 @@ request的相关属性见 https://blog.csdn.net/claroja/article/details/80691766
 '''
 
 
-@app.route('/', methods=['POST', "Get"])
+@app.route('/WechatAPI', methods=['POST', "Get"])
 def Wechat_API():
     if request.method == 'POST':
         request_object = request.json  # demjson.decode(request.data)
-        message(request_object)
+        on_message(request_object)
         return request_object
 
     else:
-        return "<html><body>如果能看到这些内容,说明可以连接到回调接口了</body>"
+        return "<html><body>如果能看到这些内容,说明可以连接到回调接口了,请改用post方式发送</body>"
 
 
-def server(host='127.0.0.1', post='8888', on_message = None):
-    global message
-    message = on_message
+def Start(on_message1):
+    global on_message
+    on_message = on_message1
     print("server begin")
-    server = pywsgi.WSGIServer((host, post), app, log=None)
+    server = pywsgi.WSGIServer(("127.0.0.1", 8889), app, log=None)
     server.serve_forever()

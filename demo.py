@@ -4,21 +4,12 @@
 # @File    : demo.py
 # @Software: PyCharm
 
-from server import server
 from wechat import WechatAPI
 import threading
-
-def on_message(message):
-    print(message)
-    if message.get('type','') == 1:
-        # 复读机
-        wechat_manager.SendText(message['pid'], message['data']['fromid'], message['data']['msg'])
-    if message.get('type','') == 37:
-        # 自动通过好友
-        wechat_manager.AgreeUser(message['pid'], message['data']['msg'])
-
+from msg_consumer.SentConsumer import sent_msg_consumer
+from msg_consumer.ReceiveConsumer import message_queue_consumer, on_message
 
 wechat_manager = WechatAPI()  # 实例机器人
-wechat_manager.start()  # 启动微信
-Server=server(host='127.0.0.1', post=8889, on_message=on_message)  # 创建回调接口服务器
-threading.Thread(target=Server).start()  # 启动回调接口服务器
+threading.Thread(target=wechat_manager.start, args=(on_message,)).start()  # 启动机器人服务
+threading.Thread(target=message_queue_consumer).start()  # 消息处理服务
+threading.Thread(target=sent_msg_consumer, args=(wechat_manager,)).start()  # 消息发送服务
